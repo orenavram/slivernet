@@ -122,6 +122,15 @@ def load_npz(fname):
     return imgs
 
 
+def load_tiff(folder_name):
+    img_paths = os.listdir(folder_name)
+    vol = []
+    for img_path in img_paths:
+        img = Image.open(f'{folder_name}/{img_path}')
+        vol.append(totensor(img)/256)
+    return vol
+
+
 class AmishNpzDataset(Dataset):
     def __init__(self, metafile, labelsfile, pathology, transform=default_transform_gray, data_format='npz'):
 
@@ -136,7 +145,8 @@ class AmishNpzDataset(Dataset):
 
         self.data_reader = dict(
             zip=default_open_imageZip_inmem,
-            npz=load_npz
+            npz=load_npz,
+            tiff=load_tiff
         )[data_format]
 
         # self.label_reader = lambda patient_id: self.labels[self.labels.PAT_ID == patient_id][pathologies].values
