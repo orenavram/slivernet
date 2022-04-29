@@ -3,25 +3,10 @@ os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"  # GPU ID
 
 from SliverNet2 import SliverNet2
-import fastai as fastai
-from fastai import *
-import fastai.optimizer
-import torch
-from fastai.learner import Learner
-from fastai.data.load import *
-from fastai.data import *
-from fastai.data.core import DataLoaders
-# from fastai.basic_data import *
-from fastai.metrics import accuracy, RocAuc, accuracy_multi
 from fastai.vision.all import *
-from tqdm import tqdm
-from vit_pytorch.nest import NesT
-import torch.optim as optim
 from nonadaptiveconcatpool2d import load_backbone
 
-from AmishTiffDataset import AmishTiffDataset
-from AmishNpzDataset import AmishNpzDataset
-from AmishDataLoader import AmishDataLoader
+from AmishDataset import AmishDataset
 
 # nest = NesT(
 #     image_size=19 * 256,
@@ -32,17 +17,14 @@ from AmishDataLoader import AmishDataLoader
 #     block_repeats=(2, 2, 8),  # the number of transformer blocks at each heirarchy, starting from the bottom
 #     num_classes=1
 # )
-# x=torch.rand(1,3,19*256,256)
-# pred = nest(x.to(device))
-# print(pred)
 
 
 print(f'Using GPU #{os.environ["CUDA_VISIBLE_DEVICES"]}')
-# ds = AmishTiffDataset('/scratch/avram/Amish/tiffs'); print(f'TIFF data')
-ds = AmishNpzDataset('/scratch/avram/Amish/npz_oct_metafile.csv',
-                     '/scratch/avram/Amish/labels.csv',
-                     pathology='cRORA'); print(f'NPZ data')
-                     # ['iRORA', 'cRORA']); print(f'NPZ data')
+ds = AmishDataset('/scratch/avram/Amish/oct_metafile.csv',
+                  '/scratch/avram/Amish/labels.csv',
+                  data_format='npz',
+                  pathology='cRORA')
+                  # ['iRORA', 'cRORA']); print(f'NPZ data')
 
 batch_size = 16
 num_workers = 64

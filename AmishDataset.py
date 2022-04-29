@@ -25,11 +25,7 @@ def get_label(sample, labels, pathology):
     filename = sample.split('/')[-1]
 
     _, patient_id, exam_date, laterality, _ = filename.split('_')
-    if laterality == 'R':
-        laterality = 'OD'
-    elif laterality == 'S':
-        laterality = 'OS'
-    else:
+    if laterality == 'NA':
         laterality = 'NULL'  # so the returned label will be empty
     label = labels[(labels.PAT_ID == patient_id) &
                    (labels.EXAM_DATE == exam_date) &
@@ -38,7 +34,7 @@ def get_label(sample, labels, pathology):
 
 def get_samples(metadata, labels, pathology):
     samples = []
-    for sample in metadata.filename.values:
+    for sample in metadata.vol_name.values:
 
         if 'cube' not in sample:
             continue
@@ -114,42 +110,42 @@ def default_open_imageZip_inmem(zipname):
     return ims
 
 
-def load_npz(fname):
+def load_npz(vol_name, npz_path='/scratch/avram/Amish/npz'):
     # NOTE: preferably use universal metadata formats
     #  so that we don't have to specify this
-    vol = np.load(fname)['oct_volume']
+    vol = np.load(f'{npz_path}/{vol_name}.npz')['oct_volume']
     imgs = [totensor(mat / 256) for mat in vol]
     return imgs
 
 
-def load_tiff(folder_name):
-    img_paths = os.listdir(folder_name)
+def load_tiff(vol_name, tiff_path='/scratch/avram/Amish/tiffs'):
+    img_paths = os.listdir(f'{tiff_path}/{vol_name}')
     vol = []
-    for img_path in img_paths:
-        img = Image.open(f'{folder_name}/{img_path}')
+    for img_name in img_paths:
+        img = Image.open(f'{tiff_path}/{vol_name}/{img_name}')
         vol.append(totensor(img)/256)
     return vol
 
 
-class AmishNpzDataset(Dataset):
-    def __init__(self, metafile, labelsfile, pathology, transform=default_transform_gray, data_format='npz'):
+class AmishDataset(Dataset):
+    def __init__(self, metafile_path, labels_path, pathology, transform=default_transform_gray, data_format='npz'):
 
-        self.metadata = pd.read_csv(metafile)
-        self.labels = pd.read_csv(labelsfile)
-        self.pathology = pathology
         # metadata fields are:
-        # filename,patientid,patientid_e2e,laterality,num_slices,vol_number,dob
+        # vol_name,patientid,patientid_e2e,laterality,num_slices,vol_number,dob
+        self.metadata = pd.read_csv(metafile_path)
+        self.labels = pd.read_csv(labels_path)
+        self.pathology = pathology
         self.samples = get_samples(self.metadata, self.labels, pathology)
-        # self.slices = (lambda df: [x for x in df[df['num_slices'] >= 97]['num_slices'].values])(self.metadata)
         self.t = transform
 
+        print(f'{data_format.upper()} dataset loaded')
         self.data_reader = dict(
             zip=default_open_imageZip_inmem,
             npz=load_npz,
             tiff=load_tiff
         )[data_format]
 
-        # self.label_reader = lambda patient_id: self.labels[self.labels.PAT_ID == patient_id][pathologies].values
+        self.label_reader = get_label
 
 
     def __len__(self):
@@ -157,19 +153,11 @@ class AmishNpzDataset(Dataset):
 
     def __getitem__(self, idx):
         sample = self.samples[idx]
-        patient_id = self.metadata.iloc[idx, ].patientid
         # print(f'Loading {sample}')
 
         # torch tensor (image) or list of tensors (volume)
         imgs = self.data_reader(sample)
-        # label = self.label_reader(patient_id)
-        label = int(get_label(sample, self.labels, self.pathology))
-        # label = 0
-
-        if self.t is not None:
-            imgs = [self.t(im) for im in imgs]
-
-        # t_imgs = torch.stack(imgs)
+        label = int(self.label_reader(sample, self.labels, self.pathology))
 
         # atm our models use volumes stacked vertically as imgs
         t_imgs = torch.cat([self.t(im) for im in imgs], dim=1)
