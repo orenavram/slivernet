@@ -42,7 +42,7 @@ class FeatureCNN2(torch.nn.Module):
         self.fc1 = torch.nn.Linear(self._conv_filters + ncov, FC1_OUT)
         self.fc2 = torch.nn.Linear(FC1_OUT, n_out)
 
-    def forward(self,x,cov=None):
+    def forward(self, x, cov=None):
         # x: B x C x N
         x = self.conv1(x)
         # x: B x C x N-(kernel_size-1) // 1
@@ -65,7 +65,8 @@ class FeatureCNN2(torch.nn.Module):
         x = x.view(-1, self._conv_filters)
         # x: B x C
         # x = x.flatten()
-        if(self.ncov): x=torch.cat((x,cov),dim=1)
+        if self.ncov:
+            x=torch.cat((x, cov), dim=1)
         # x: B x C+ncov
         x = self.fc1(x)
         # x: B x n_FC
