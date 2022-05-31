@@ -1,32 +1,21 @@
-import pandas as pd
+import torch
 from torch.utils.data import Dataset
 from auxiliaries import *
 
 
 class AmishDataset(Dataset):
-    def __init__(self, metafile_path, annotations_path, pathologies, transform=default_transform_gray,
-                 data_format='npz'):
-        # metadata fields are: vol_name,patientid,patientid_e2e,laterality,num_slices,vol_number,dob
-        self.metadata = pd.read_csv(metafile_path)
-
-        # sort to take the earliest date when multiple scans were (on different dates)
-        self.annotations = pd.read_csv(annotations_path, parse_dates=['EXAM_DATE']).sort_values('EXAM_DATE')
-
-        self.pathologies = pathologies
-
-        self.samples = get_samples(self.metadata, self.annotations, pathologies)
-
+    def __init__(self, data, pathologies, transform=default_transform_gray, data_format='npz'):
+        self.samples = data.index.tolist()
+        self.labels = data[pathologies]
         self.t = transform
-
-        logger.info(f'{data_format.upper()} dataset loaded')
         self.data_reader = dict(
             zip=default_open_imageZip_inmem,
             npz=load_npz,
             tiff=load_tiff
         )[data_format]
 
+        logger.info(f'{data_format.upper()} dataset loaded')
         logger.info(f'Predicting {pathologies}')
-        self.label_reader = get_labels
 
     def __len__(self):
         return len(self.samples)
@@ -35,11 +24,10 @@ class AmishDataset(Dataset):
         sample = self.samples[idx]
         logger.debug(f'Loading {sample}')
 
-        # torch tensor (image) or list of tensors (volume)
         imgs = self.data_reader(sample)
-        labels = self.label_reader(sample, self.annotations, self.pathologies)
+        labels = self.labels.loc[sample].values
 
-        # atm our models use volumes stacked vertically as imgs
+        # tile volume slices into one very long image
         t_imgs = torch.cat([self.t(im) for im in imgs], dim=1)
 
         logger.debug(t_imgs.shape)
